@@ -101,55 +101,58 @@ class AbstractLearner:
             pass
 
     def epoch(self):
-        with self.__callback_context("epoch"):
-            for batch_number, (xb, yb) in enumerate(self.epoch_context["dl"]):
-                self.batch_context["current_batch"] = batch_number
-                self.batch_context["x"] = xb
-                self.batch_context["y"] = yb
-                self.batch()
-
+        try:
+            with self.__callback_context("epoch"):
+                for batch_number, (xb, yb) in enumerate(self.epoch_context["dl"]):
+                    self.batch_context["current_batch"] = batch_number
+                    self.batch_context["x"] = xb
+                    self.batch_context["y"] = yb
+                    self.batch()
+        
+        finally:
             self.batch_context.clear()
 
     def batch(self):
-        with self.__callback_context("batch"):
-            self.batch_op["predictions"] = self.predict()
-            self.batch_op["loss"] = self.loss()
-            if self.epoch_context["mode"] == "train":
-                self.zero_grad()
-                self.backward()
-                self.step()
-
-        self.batch_op.clear()
+        try:
+            with self.__callback_context("batch"):
+                self.batch_op["predictions"] = self.predict()
+                self.batch_op["loss"] = self.loss()
+                if self.epoch_context["mode"] == "train":
+                    self.zero_grad()
+                    self.backward()
+                    self.step()
+        finally:
+            self.batch_op.clear()
 
     def fit(self, n_epochs, with_validation=True, fit_callbacks=None):
         if fit_callbacks is not None:
             for callback in fc.L(fit_callbacks):
                 self.register_callback(callback)
+        try:
+            self.fit_context["n_epochs"] = n_epochs
+            self.fit_context["with_validation"] = with_validation
+            self.fit_context["epochs"] = range(1, n_epochs + 1)
+            with self.__callback_context("fit"):
+                for epoch in self.fit_context["epochs"]:
+                    self.epoch_context["current_epoch"] = epoch
 
-        self.fit_context["n_epochs"] = n_epochs
-        self.fit_context["with_validation"] = with_validation
-        self.fit_context["epochs"] = range(1, n_epochs + 1)
-        with self.__callback_context("fit"):
-            for epoch in self.fit_context["epochs"]:
-                self.epoch_context["current_epoch"] = epoch
+                    self.epoch_context["mode"] = "train"
+                    self.epoch_context["dl"] = self.train_dl
+                    self.model.train(True)
 
-                self.epoch_context["mode"] = "train"
-                self.epoch_context["dl"] = self.train_dl
-                self.model.train(True)
+                    self.epoch()
 
-                self.epoch()
+                    if with_validation:
+                        self.epoch_context["mode"] = "evaluate"
+                        self.epoch_context["dl"] = self.validation_dl
+                        self.model.train(False)
 
-                if with_validation:
-                    self.epoch_context["mode"] = "evaluate"
-                    self.epoch_context["dl"] = self.validation_dl
-                    self.model.train(False)
-
-                    with torch.no_grad():
-                        self.epoch()
-
+                        with torch.no_grad():
+                            self.epoch()
+        finally:
             self.epoch_context.clear()
-        self.fit_context.clear()
+            self.fit_context.clear()
 
-        if fit_callbacks is not None:
-            for callback in fc.L(fit_callbacks):
-                self.unregister_callback(callback)
+            if fit_callbacks is not None:
+                for callback in fc.L(fit_callbacks):
+                    self.unregister_callback(callback)
