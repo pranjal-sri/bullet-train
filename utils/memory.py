@@ -1,5 +1,5 @@
 import sys, traceback, gc
-
+import torch
 
 def clean_ipython_history():
     if not "get_ipython" in globals():
@@ -26,3 +26,11 @@ def clean_traceback_history():
         delattr(sys, "last_type")
     if hasattr(sys, "last_value"):
         delattr(sys, "last_value")
+
+
+def clean_memory():
+    clean_traceback_history()
+    clean_ipython_history()
+
+    gc.collect()
+    torch.cuda.empty_cache()
