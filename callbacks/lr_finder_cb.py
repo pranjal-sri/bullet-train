@@ -16,10 +16,9 @@ class LRFinderCallback(Callback):
         self.learning_rates = []
         self.min = float('inf')
 
-    def before_epoch(self):
-        if self.learner.epoch_context['mode'] == 'evaluate':
-            raise CancelEpochException
-        
+    def before_batch(self):
+      if self.learner.epoch_context['mode'] == 'evaluate':
+        raise CancelEpochException()
     def after_batch(self):
         self.learning_rates.append(self.learner.optimizer.param_groups[0]['lr'])
         loss = self.learner.batch_op['loss'].detach().cpu()

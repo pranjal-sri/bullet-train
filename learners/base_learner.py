@@ -80,8 +80,11 @@ class AbstractLearner:
             self.register_callback(cb)
 
         if load_default_callbacks:
-            self.register_callback(DeviceCallback(self.device))
-            self.register_callback(MetricsWithProgressCallback(plot = plot))
+            self.device = DeviceCallback(self.device)
+            self.register_callback(self.device)
+            
+            self.metrics =MetricsWithProgressCallback(plot = plot)
+            self.register_callback(self.metrics)
 
     def __run_callbacks(self, function_name):
         for callback in self.__callbacks:
@@ -118,9 +121,9 @@ class AbstractLearner:
                 self.batch_op["predictions"] = self.predict()
                 self.batch_op["loss"] = self.loss()
                 if self.epoch_context["mode"] == "train":
-                    self.zero_grad()
                     self.backward()
                     self.step()
+                    self.zero_grad()
         finally:
             self.batch_op.clear()
 

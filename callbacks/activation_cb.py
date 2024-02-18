@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 from .base_callback import Callback
 import torch
-
+from ..utils.move_tensor import detach_to_cpu
 
 class ActivationCallback(Callback):
     def __init__(self, h_ratio_k=2, width_per_layer=5, height_per_layer=5, n_cols=2):
@@ -26,10 +26,10 @@ class ActivationCallback(Callback):
             def hook_i(module, input, output, layer_i=i):
                 # important to use layer_i because functions close over variables, not values
                 # Read: https://eev.ee/blog/2011/04/24/gotcha-python-scoping-closures/
-                if self.learner.epoch_context["mode"] == "train":
+                if module.training:
                     self.activation_means[layer_i].append(output.mean().item())
                     self.activation_stds[layer_i].append(output.std().item())
-                    self.activation_hists[layer_i].append(output.abs().histc(50, 0, 10))
+                    self.activation_hists[layer_i].append(detach_to_cpu(output.abs().histc(50, 0, 10)))
 
             self.hooks.append(hook_i)
             layer_handle = layer.register_forward_hook(hook_i)
